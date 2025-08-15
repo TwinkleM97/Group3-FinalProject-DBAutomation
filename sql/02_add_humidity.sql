@@ -1,0 +1,2 @@
+ALTER TABLE project_db.ClimateData
+  ADD COLUMN IF NOT EXISTS humidity FLOAT NOT NULL DEFAULT 50.0;

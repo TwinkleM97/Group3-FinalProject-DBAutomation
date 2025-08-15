@@ -1,0 +1,15 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: automated-mysql-server
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: Secret5555
+      MYSQL_DATABASE: project_db
+    ports:
+      - "3307:3306"
+    command: --general_log=1 --general_log_file=/var/lib/mysql/general.log --log_error_verbosity=3
+    volumes:
+      - dbdata:/var/lib/mysql
+volumes:
+  dbdata:

@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pytest_cache/
+
+# Virtual environment
+.venv/
+env/
+venv/
+
+# Environment variables & config
+.env
+*.env
+*.cnf
+*.ini
+
+# Logs
+*.log
+logs/
+*.out
+*.err
+
+# Docker
+**/docker-compose.override.yml
+**/docker-data/
+**/data/
+**/tmp/
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Signoz/otel generated data
+monitoring/signoz/data/
+monitoring/otel/data/
+
+# Python virtual environment
+.venv/
+
+# Secrets and configuration files
+.secrets/
+*.cnfmonitoring/signoz

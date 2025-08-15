@@ -1,0 +1,45 @@
+receivers:
+  # --- MySQL LOGS ---
+  filelog:
+    include:
+      - /var/lib/mysql/mysql-general.log
+      - /var/lib/mysql/mysql-slow.log
+    start_at: beginning
+
+  # --- MySQL METRICS ---
+  mysql:
+    endpoint: "automated-mysql-server:3306"   
+    username: "otel"
+    password: "Secret5555"
+    database: "project_db"
+    collection_interval: 15s
+
+processors:
+  # add service.name to log records
+  resource:
+    attributes:
+      - key: service.name
+        action: upsert
+        value: automated-mysql-server
+  batch: {}
+
+exporters:
+  otlp:
+    endpoint: signoz-otel-collector:4317
+    tls:
+      insecure: true
+  logging:
+    verbosity: detailed
+
+service:
+  pipelines:
+    # logs -> SigNoz
+    logs:
+      receivers: [filelog]
+      processors: [resource, batch]
+      exporters: [logging, otlp]
+    # metrics -> SigNoz
+    metrics:
+      receivers: [mysql]
+      processors: [batch]
+      exporters: [logging, otlp]

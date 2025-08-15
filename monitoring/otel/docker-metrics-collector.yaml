@@ -1,0 +1,41 @@
+receivers:
+  filelog:
+    include: [/var/lib/docker/containers/*/*.log]
+    start_at: end
+    operators:
+      - type: json_parser
+        id: docker_json
+        parse_from: body
+        timestamp:
+          parse_from: attributes.time
+          layout_type: strptime
+          layout: '%Y-%m-%dT%H:%M:%S.%fZ'
+      - type: move
+        from: attributes.log
+        to: body
+      - type: add
+        field: resource.service.name
+        value: automated-mysql-server
+  docker_stats:
+    endpoint: unix:///var/run/docker.sock
+    collection_interval: 15s
+
+processors:
+  batch: {}
+
+exporters:
+  otlp:
+    endpoint: signoz-otel-collector:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    logs:
+      receivers: [filelog]
+      processors: [batch]
+      exporters: [otlp]
+    metrics:
+      receivers: [docker_stats]
+      processors: [batch]
+      exporters: [otlp]

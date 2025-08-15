@@ -1,0 +1,22 @@
+services:
+  automated-mysql-server:
+    image: mysql:8.0
+    container_name: automated-mysql-server
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: Secret5555
+      MYSQL_DATABASE: project_db
+    ports:
+      - "3307:3306"
+    command: >
+      --general_log=1
+      --general_log_file=/var/lib/mysql/mysql-general.log
+      --log_error_verbosity=3
+      --slow_query_log=1
+      --slow_query_log_file=/var/lib/mysql/mysql-slow.log
+      --long_query_time=0.2
+      --log_queries_not_using_indexes=1
+    volumes:
+      - dbdata:/var/lib/mysql
+volumes:
+  dbdata:
