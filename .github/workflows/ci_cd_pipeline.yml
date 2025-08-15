@@ -17,19 +17,14 @@ jobs:
           MYSQL_DATABASE: project_db
         ports:
           - 3306:3306
+        # Do NOT override entrypoint.
         options: >-
           --name automated-mysql-server
-          --health-cmd="mysqladmin ping -h localhost -p${MYSQL_ROOT_PASSWORD}"
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD}"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=15
           --health-start-period=20s
-          --entrypoint sh
-        # enable general log for logs visibility
-        # Use entrypoint to pass mysqld args
-        # run mysqld as command with logs:
-        # (Workaround: override entrypoint to sh -c 'exec mysqld ...')
-        # But GitHub "services" doesn't support command easily; okay to skip general log in CI.
 
     steps:
       - uses: actions/checkout@v4
@@ -61,13 +56,19 @@ jobs:
       - name: Wait for DB
         run: |
           for i in $(seq 1 60); do
-            mysql --defaults-extra-file=.secrets/mysql.cnf -e "SELECT 1;" && break
+            if mysql --defaults-extra-file=.secrets/mysql.cnf -e "SELECT 1;" >/dev/null 2>&1; then
+              echo "MySQL is up"; exit 0
+            fi
             sleep 2
           done
+          echo "MySQL did not become ready in time"
+          docker ps -a
+          docker logs automated-mysql-server || true
+          exit 1
 
       - name: Initial Schema Deployment
         run: |
-          mysql --defaults-extra-file=.secrets/mysql.cnf < sql/01_create_schema.sql
+          mysql --defaults-extra-file=.secrets/mysql.cnf < sql/01_create_climatedata.sql
 
       - name: Schema Update (add humidity)
         run: |
@@ -84,17 +85,16 @@ jobs:
       - name: Validation
         run: |
           echo "== Table structure =="
-          mysql --defaults-extra-file=.secrets/mysql.cnf -e "SHOW CREATE TABLE project_db.ClimateData\G"
+          mysql --defaults-extra-file=.secrets/mysql.cnf -e "USE project_db; DESCRIBE ClimateData;"
           echo "== Columns check =="
-          mysql --defaults-extra-file=.secrets/mysql.cnf -e "SHOW COLUMNS FROM project_db.ClimateData LIKE 'humidity';"
+          mysql --defaults-extra-file=.secrets/mysql.cnf -e "USE project_db; SHOW COLUMNS FROM ClimateData LIKE 'humidity';"
           echo "== Counts =="
-          mysql --defaults-extra-file=.secrets/mysql.cnf -e "SELECT COUNT(*) AS total_rows FROM project_db.ClimateData;"
+          mysql --defaults-extra-file=.secrets/mysql.cnf -e "USE project_db; SELECT COUNT(*) AS total_rows FROM ClimateData;"
           echo "== Sample hot rows =="
-          mysql --defaults-extra-file=.secrets/mysql.cnf -e "SELECT location, record_date, temperature, humidity FROM project_db.ClimateData WHERE temperature > 20 ORDER BY record_date DESC LIMIT 10;"
+          mysql --defaults-extra-file=.secrets/mysql.cnf -e "USE project_db; SELECT location, record_date, temperature, humidity FROM ClimateData WHERE temperature > 20 ORDER BY record_date DESC LIMIT 10;"
 
       - name: Upload pipeline logs
         uses: actions/upload-artifact@v4
         with:
           name: pipeline-logs
-          path: |
-            pipeline_run.log
+          path: pipeline_run.log
