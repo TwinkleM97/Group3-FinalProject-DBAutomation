@@ -505,22 +505,5 @@ ask_or_auto "Start SigNoz backend locally now?" start_signoz
 ask_or_auto "Start OTEL collector to ship MySQL logs to SigNoz?" start_mysql_log_collector
 ask_or_auto "Start OTEL collector to ship Docker metrics to SigNoz?" start_docker_metrics_collector
 
-# Optional: run 'act' CI locally
-if [[ $AUTO -eq 1 ]]; then
-  RUN_ACT="n"
-else
-  read -p "Run local CI with act? (y/n): " RUN_ACT
-fi
-if [[ "$RUN_ACT" =~ ^[Yy]$ ]]; then
-  command -v act >/dev/null 2>&1 || {
-    sudo apt-get update && sudo apt-get install -y curl tar
-    ARCH=$(uname -m); [[ "$ARCH" = x86_64 ]] && REL="Linux_x86_64" || REL="Linux_arm64"
-    curl -L "https://github.com/nektos/act/releases/latest/download/act_${REL}.tar.gz" -o act.tgz
-    tar -xzf act.tgz && sudo mv act /usr/local/bin/ && rm -f act.tgz
-  }
-  warn "If port clash on 3307: docker stop automated-mysql-server"
-  act -W .github/workflows/ci_cd_pipeline.yml -P ubuntu-latest=catthehacker/ubuntu:act-latest || warn "[ACT] Run failed (check workflow or use real GitHub Actions)."
-fi
-
 say "=== DONE ==="
 

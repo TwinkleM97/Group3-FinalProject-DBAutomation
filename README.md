@@ -42,20 +42,27 @@ cat > .secrets/mysql.cnf <<EOF
 host=127.0.0.1
 user=root
 password=Secret5555
-port=3306
+port=3307
 database=project_db
 EOF
 ```
 
-### 3. Start Services with Docker Compose
+### 3. Clone SigNoz (Required for Monitoring)
 ```bash
-docker-compose up -d
+rm -rf monitoring/signoz
+git clone https://github.com/SigNoz/signoz.git monitoring/signoz
 ```
 
-### 4. Run All Steps Locally
+### 4. Start Services with Docker Compose
+```bash
+docker compose -f monitoring/mysql/docker-compose.mysql.yaml up -d
+docker compose -f monitoring/signoz/deploy/docker/docker-compose.yaml up -d
+```
+
+### 5. Run All Steps Locally
 ```bash
 chmod +x run_all.sh
-./run_all.sh
+./run_all.sh --auto
 ```
 
 This will:
@@ -66,6 +73,18 @@ This will:
 5. Seed data (`sql/03_seed_data.sql`)
 6. Run concurrent queries via Python (`scripts/multi_thread_queries.py`)
 7. Validate database (`sql/99_validate.sql`)
+8. Start SigNoz backend & OTEL collectors
+
+### 6. Run Python Script Manually
+```bash
+python scripts/multi_thread_queries.py --config .secrets/mysql.cnf
+```
+
+### 7. Stopping and Cleaning Docker
+```bash
+docker compose down -v
+docker system prune -a --volumes
+```
 
 ## GitHub Actions CI/CD
 The GitHub Actions workflow (`.github/workflows/ci_cd_pipeline.yml`) runs automatically on every push and performs:
@@ -77,16 +96,43 @@ The GitHub Actions workflow (`.github/workflows/ci_cd_pipeline.yml`) runs automa
 - Log artifact upload
 
 ## Monitoring Setup
-Monitoring is configured using the files:
+Monitoring is configured using:
 - `monitoring/otel/otel-collector-config.yaml`
 - `monitoring/otel/docker-metrics-collector.yaml`
 - `monitoring/signoz`
 
 Start the monitoring stack:
 ```bash
-docker-compose -f monitoring/signoz/docker-compose.yaml up -d
+docker compose -f monitoring/signoz/deploy/docker/docker-compose.yaml up -d
 ```
 
+## Tear Down
+```
+echo "[TEARDOWN] Kill ad-hoc collectors (if any)…"
+docker rm -f otelcol-docker-metrics otelcol-mysql-logs 2>/dev/null || true
+
+echo "[TEARDOWN] Bring down MySQL and delete its volume…"
+docker compose -f monitoring/mysql/docker-compose.mysql.yaml down -v --remove-orphans || true
+
+echo "[TEARDOWN] Bring down SigNoz stack and delete its volumes…"
+if [ -d monitoring/signoz/deploy/docker ]; then
+  (cd monitoring/signoz/deploy/docker && docker compose down -v --remove-orphans || true)
+fi
+
+echo "[TEARDOWN] Clean up any leftover SigNoz containers/networks…"
+
+docker rm -f $(docker ps -aq --filter "name=signoz") 2>/dev/null || true
+docker rm -f signoz-otel-collector 2>/dev/null || true
+for N in $(docker network ls --format '{{.Name}}' | grep -i signoz); do
+  docker network rm "$N" 2>/dev/null || true
+done
+
+echo "[TEARDOWN] Prune dangling volumes & networks (optional but helpful)…"
+docker volume prune -f || true
+docker network prune -f || true
+
+echo "[TEARDOWN] Done."
+```
 ## Screenshots & Results
 
 ### MySQL Version Check
